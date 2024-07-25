@@ -15,6 +15,7 @@
 
 mod csv_test;
 mod document;
+use eframe::egui;
 
 const IMAGE_PATH_JPG: &'static str = r"images\farbalogo.jpg";
 const DIR_NAME: &str = r"fonts\JetbrainsMono\";
@@ -22,6 +23,7 @@ const DIR_NAME: &str = r"fonts\JetbrainsMono\";
 // const CUSTOMER_INFO: Vec;
 // const ITEMS: Vec;
 
+// find way to differentiate unix paths and windows paths
 const PERSONAL_CSV: &str = r"src\csv\personal.csv";
 const CUSTOMER_CSV: &str = r"src\csv\customer.csv";
 const ITEMS_CSV: &str = r"src\csv\items.csv";
@@ -39,4 +41,85 @@ fn main() {
         item_records,
         ESTIMATE_NUMBER,
     );
+
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
+        ..Default::default()
+    };
+    let _ = eframe::run_native(
+        "Invoicy",
+        options,
+        Box::new(|_cc| {
+            // This gives us image support:
+            Ok(Box::<MyApp>::default())
+        }),
+    );
 }
+struct MyApp {
+    name: String,
+    age: u32,
+}
+
+impl Default for MyApp {
+    fn default() -> Self {
+        Self {
+            name: "Arthur".to_owned(),
+            age: 42,
+        }
+    }
+}
+
+impl eframe::App for MyApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            // ui.heading("My egui Application");
+            ui.horizontal(|ui| {
+                if ui.button("+ Customer").clicked() {}
+                if ui.button("+ Contact").clicked() {}
+            });
+
+            ui.horizontal(|ui| {
+                let name_label = ui.label("Your name: ");
+                ui.text_edit_singleline(&mut self.name)
+                    .labelled_by(name_label.id);
+            });
+            ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
+            if ui.button("Increment").clicked() {
+                self.age += 1;
+            }
+            ui.label(format!("Hello '{}', age {}", self.name, self.age));
+
+            // ui.image(egui::include_image!(
+            //     "../../../crates/egui/assets/ferris.png"
+            // ));
+        });
+    }
+}
+
+// pub struct PersonalInfoLayout {
+//     name: &str,
+//     address: &str,
+//     company: &str,
+//     city: &str,
+//     postal_code: &str,
+//     coutnry: &str,
+//     telephone: i32,
+//     email: &str,
+//     website: &str,
+// }
+
+// impl Default for PersonalInfoLayout {
+//     fn default() -> Self {
+//         Self {
+//             name: Some('…'),
+//             address: Some('…'),
+//             company: Some('…'),
+//             city: Some('…'),
+//             postal_code: Some('…'),
+//             coutnry: Some('…'),
+//             telephone: 2183244356,
+//             email: Some('…'),
+//             website: Some('…'),
+//         }
+//     }
+// }

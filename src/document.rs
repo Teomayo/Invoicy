@@ -32,7 +32,6 @@ pub fn generate_document(
     // wasn't sure how to get system name in global variables so doing this for now
     // let account_name: String = whoami::username().to_string();
     // let dir_name: String = format!("/Users/{account_name}/Library/Fonts/").to_string();
-
     let font_dirs: &[String] = &[font_dir.to_string()];
     // On windows machine use line below for now
 
