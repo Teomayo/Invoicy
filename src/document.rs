@@ -37,15 +37,16 @@ pub fn generate_document(
 
     let collection: Vec<&str> = if cfg!(windows) {
         (font_dir.split(r"\")).collect::<Vec<&str>>()
-    } else if cfg!(macos) {
-        (font_dir.split(r"\")).collect::<Vec<&str>>()
+    } else if cfg!(unix) {
+        (font_dir.split(r"/")).collect::<Vec<&str>>()
     } else {
-        (font_dir.split(r"\")).collect::<Vec<&str>>()
+        (font_dir.split(r"/")).collect::<Vec<&str>>()
     };
 
+    // this part is kind of unnecessary, simplify in the future
     let font_index: usize = if cfg!(windows) {
         1
-    } else if cfg!(macos) {
+    } else if cfg!(unix) {
         1
     } else {
         1
