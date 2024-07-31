@@ -33,25 +33,11 @@ pub fn generate_document(
     // let account_name: String = whoami::username().to_string();
     // let dir_name: String = format!("/Users/{account_name}/Library/Fonts/").to_string();
     let font_dirs: &[String] = &[font_dir.to_string()];
-    // On windows machine use line below for now
-
-    let collection: Vec<&str> = if cfg!(windows) {
-        (font_dir.split(r"\")).collect::<Vec<&str>>()
-    } else if cfg!(unix) {
-        (font_dir.split(r"/")).collect::<Vec<&str>>()
-    } else {
-        (font_dir.split(r"/")).collect::<Vec<&str>>()
-    };
+    let collection: Vec<&str> = (font_dir.split(r"/")).collect::<Vec<&str>>();
 
     // this part is kind of unnecessary, simplify in the future
-    let font_index: usize = if cfg!(windows) {
-        1
-    } else if cfg!(unix) {
-        1
-    } else {
-        1
-    };
-    let font_name: &String = &collection[font_index].to_string();
+    let font_name_index: usize = 1;
+    let font_name: &String = &collection[font_name_index].to_string();
 
     let args: Vec<_> = env::args().skip(1).collect();
     if args.len() != 1 {
