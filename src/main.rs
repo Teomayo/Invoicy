@@ -16,7 +16,7 @@
 mod csv_test;
 mod document;
 
-use eframe::egui::{self, TextEdit};
+use eframe::egui::{self, Rect, Response, TextEdit};
 use egui_extras::{Column, TableBuilder};
 
 const IMAGE_PATH_JPG: &'static str = r"images/farbalogo.jpg";
@@ -143,32 +143,64 @@ impl eframe::App for MyApp {
                     });
                 })
                 .body(|mut body| {
+                    if self.last_updated_row < self.row_count {
+                        println!(
+                            "{}",
+                            format!(
+                                "last updated row: {:?}\nrow count: {:?}",
+                                self.last_updated_row, self.row_count
+                            )
+                        );
+                        // sets up default rows and adds it to storage table
+                        for idx in self.last_updated_row..self.row_count {
+                            body.row(30.0, |mut row| {
+                                // currently hardcoded until there is a plan for table customizability
+                                for column_count in 0..4 {
+                                    let mut text = format!("{:?}", (idx, column_count));
+                                    if column_count == 0 {
+                                        let output = row.col(|ui| {
+                                            ui.label(idx.to_string());
+                                        });
+                                        self.table_data.push((text, (idx, column_count), output));
+                                    } else {
+                                        let output = row.col(|ui| {
+                                            ui.add(TextEdit::singleline(&mut text));
+                                            ui.end_row();
+                                        });
+                                        // pushing all the table data into the requested amount of rows
+                                        self.table_data.push((text, (idx, column_count), output));
+                                    }
+                                }
+                            });
+                        }
+                        self.last_updated_row = self.row_count;
+                    }
+                    // continuously updates tables based on table data
                     for idx in 0..self.row_count {
                         body.row(30.0, |mut row| {
                             // currently hardcoded until there is a plan for table customizability
                             for column_count in 0..4 {
-                                let mut new_val =
-                                    (format!("{:?}", [idx, column_count]), (idx, column_count));
-                                if column_count == 0 {
-                                    row.col(|ui| {
-                                        ui.label(idx.to_string());
-                                    });
-                                } else {
-                                    row.col(|ui| {
-                                        ui.add(TextEdit::singleline(&mut new_val.0));
-                                        ui.end_row();
-                                    });
+                                for cell in &mut self.table_data {
+                                    if (cell.1) == (idx, column_count) {
+                                        if column_count == 0 {
+                                            row.col(|ui| {
+                                                ui.label(idx.to_string());
+                                            });
+                                        } else {
+                                            row.col(|ui| {
+                                                ui.add(TextEdit::singleline(&mut cell.0));
+                                                ui.end_row();
+                                            });
+                                        }
+                                    }
                                 }
                             }
                         });
                     }
-                    self.last_updated_row += 1;
-                    self.initialized = true;
                 });
             if ui.button("+ Add Row").clicked() {
                 self.new_row_added = true;
                 self.row_count += 1;
-                // println!("{:?}", self.table);
             }
         });
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
@@ -179,19 +211,17 @@ impl eframe::App for MyApp {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 struct MyApp {
     customer_selected: usize,
     customer_selected_vec: Vec<String>,
     contact_selected: usize,
     contact_selected_vec: Vec<String>,
-    text: String,
     row_count: usize,
-    current_row_count: usize,
     last_updated_row: usize,
-    table_data: Vec<String>,
+
+    table_data: Vec<(String, (usize, i32), (Rect, Response))>,
     new_row_added: bool,
-    initialized: bool,
 }
 
 impl Default for MyApp {
@@ -202,12 +232,9 @@ impl Default for MyApp {
             contact_selected: 0,
             contact_selected_vec: Self::get_vec(),
             table_data: [].to_vec(),
-            text: "".to_string(),
             row_count: 1,
             last_updated_row: 0,
-            current_row_count: 0,
             new_row_added: false,
-            initialized: false,
         }
     }
 }
