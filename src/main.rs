@@ -13,7 +13,6 @@
 //!
 //! These fonts must be metrically identical to the built-in PDF sans-serif font (Helvetica/Arial).
 
-mod csv_test;
 mod document;
 
 use eframe::egui::{self, Rect, Response, TextEdit, Ui, Window};
@@ -23,25 +22,8 @@ const IMAGE_PATH_JPG: &'static str = r"images/farbalogo.jpg";
 
 const DIR_NAME: &str = r"fonts/JetbrainsMono/";
 
-const PERSONAL_CSV: &str = r"src/csv/personal.csv";
-const CUSTOMER_CSV: &str = r"src/csv/customer.csv";
-const ITEMS_CSV: &str = r"src/csv/items.csv";
-
 const ESTIMATE_NUMBER: i32 = 1;
 fn main() {
-    let result = csv_test::main(PERSONAL_CSV, CUSTOMER_CSV, ITEMS_CSV);
-    let records = result.unwrap();
-    let (personal_customer_records, customer_records, item_records) = records;
-
-    document::generate_document(
-        DIR_NAME,
-        IMAGE_PATH_JPG,
-        personal_customer_records,
-        customer_records,
-        item_records,
-        ESTIMATE_NUMBER,
-    );
-
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([450.0, 320.0]),
         ..Default::default()
@@ -63,6 +45,11 @@ impl eframe::App for MyApp {
         if !self.initialized {
             self.customers.push(self.customer.clone());
             self.contacts.push(self.contact.clone());
+            self.file_name = format!(
+                "{:?}-{:?}.pdf",
+                self.customer.company.to_string(),
+                ESTIMATE_NUMBER
+            );
             self.initialized = true;
         }
 
@@ -156,11 +143,16 @@ impl eframe::App for MyApp {
                         for idx in self.last_updated_row..self.row_count {
                             body.row(30.0, |mut row| {
                                 // currently hardcoded until there is a plan for table customizability
-                                for column_count in 0..4 {
+                                for column_count in 0..5 {
                                     let mut text = format!("{:?}", (idx, column_count));
                                     if column_count == 0 {
                                         let output = row.col(|ui| {
                                             ui.label(idx.to_string());
+                                        });
+                                        self.table_data.push((text, (idx, column_count), output));
+                                    } else if column_count == 4 {
+                                        let output = row.col(|ui| {
+                                            ui.label(text.to_string());
                                         });
                                         self.table_data.push((text, (idx, column_count), output));
                                     } else {
@@ -180,12 +172,43 @@ impl eframe::App for MyApp {
                     for idx in 0..self.row_count {
                         body.row(30.0, |mut row| {
                             // currently hardcoded until there is a plan for table customizability
-                            for column_count in 0..4 {
+                            for column_count in 0..5 {
                                 for cell in &mut self.table_data {
                                     if (cell.1) == (idx, column_count) {
                                         if column_count == 0 {
                                             row.col(|ui| {
                                                 ui.label(idx.to_string());
+                                            });
+                                        } else if column_count == 2 {
+                                            self.current_row_value.quantity =
+                                                if cell.0.parse::<f64>().is_ok() {
+                                                    cell.0.parse().unwrap()
+                                                } else {
+                                                    0.0
+                                                };
+                                            row.col(|ui| {
+                                                ui.add(TextEdit::singleline(&mut cell.0));
+                                                ui.end_row();
+                                            });
+                                        } else if column_count == 3 {
+                                            self.current_row_value.price =
+                                                if cell.0.parse::<f64>().is_ok() {
+                                                    cell.0.parse().unwrap()
+                                                } else {
+                                                    0.0
+                                                };
+                                            row.col(|ui| {
+                                                ui.add(TextEdit::singleline(&mut cell.0));
+                                                ui.end_row();
+                                            });
+                                        } else if column_count == 4 {
+                                            self.current_row_value.total =
+                                                self.current_row_value.quantity
+                                                    * self.current_row_value.price;
+                                            let total_val = self.current_row_value.total;
+                                            cell.0 = total_val.to_string();
+                                            row.col(|ui| {
+                                                ui.label(format!("{:?}", total_val));
                                             });
                                         } else {
                                             row.col(|ui| {
@@ -210,17 +233,23 @@ impl eframe::App for MyApp {
             });
         });
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
-            if ui.button("Generate Invoice").clicked() {
-                // document::generate_document(
-                //     DIR_NAME,
-                //     IMAGE_PATH_JPG,
-                //     personal_customer_records,
-                //     customer_records,
-                //     item_records,
-                //     ESTIMATE_NUMBER,
-                // );
-                println!("Feature not ready yet!")
-            }
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    // TODO: needs way to strip special chars and make all one case
+                    ui.text_edit_singleline(&mut self.file_name);
+                });
+                if ui.button("Generate Invoice").clicked() {
+                    document::generate_invoice(
+                        DIR_NAME,
+                        IMAGE_PATH_JPG,
+                        self.file_name.clone(),
+                        self.contact.clone(),
+                        self.customer.clone(),
+                        self.table_data.clone(),
+                        ESTIMATE_NUMBER,
+                    );
+                }
+            });
         });
     }
 }
@@ -228,6 +257,7 @@ impl eframe::App for MyApp {
 #[derive(Clone, Debug)]
 struct MyApp {
     initialized: bool,
+    file_name: String,
     customer_selected: usize,
     contact_selected: usize,
     row_count: usize,
@@ -239,6 +269,7 @@ struct MyApp {
     customer: Customer,
     customers: Vec<Customer>,
     customer_form: bool,
+    current_row_value: RowValues,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -248,6 +279,13 @@ struct Customer {
     city: String,
     postal_code: String,
     country: String,
+}
+#[derive(Clone, Debug)]
+struct RowValues {
+    description: String,
+    quantity: f64,
+    price: f64,
+    total: f64,
 }
 #[derive(Clone, Debug, PartialEq)]
 
@@ -267,6 +305,7 @@ impl Default for MyApp {
     fn default() -> Self {
         Self {
             initialized: false,
+            file_name: "invoice.pdf".to_string(),
             customer_selected: 0,
             contact_selected: 0,
             table_data: [].to_vec(),
@@ -294,6 +333,12 @@ impl Default for MyApp {
             },
             customers: [].to_vec(),
             customer_form: false,
+            current_row_value: RowValues {
+                description: "".to_string(),
+                quantity: 1.0,
+                price: 10.0,
+                total: 10.0,
+            },
         }
     }
 }
