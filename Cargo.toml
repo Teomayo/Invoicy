@@ -6,6 +6,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+eframe = "0.28.1"
+egui_extras = "0.28.1"
 genpdf = { version = "0.2.0", features = ["images"] }
 whoami = "1.5.1"
 image = "0.25.1"
