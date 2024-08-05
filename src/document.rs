@@ -20,7 +20,6 @@ use genpdf::elements::TableLayoutRow;
 use genpdf::Alignment;
 use genpdf::Element as _;
 use genpdf::{elements, fonts, style};
-use std::env;
 
 use crate::Contact;
 use crate::Customer;
@@ -33,6 +32,7 @@ pub fn generate_invoice(
     customer_info: Customer,
     table: Vec<(String, (usize, i32), (Rect, Response))>,
     estimate_number: i32,
+    grand_total: f64,
 ) {
     // wasn't sure how to get system name in global variables so doing this for now
     // let account_name: String = whoami::username().to_string();
@@ -44,10 +44,6 @@ pub fn generate_invoice(
     let font_name_index: usize = 1;
     let font_name: &String = &collection[font_name_index].to_string();
 
-    let args: Vec<_> = env::args().skip(1).collect();
-    if args.len() != 1 {
-        panic!("Missing argument: output file");
-    }
     let output_file = file_name;
 
     let font_dir = font_dirs
@@ -237,7 +233,6 @@ pub fn generate_invoice(
     let max_cell = table.iter().max_by_key(|&&(_, y, _)| y).unwrap();
     let max_row = max_cell.1 .0 + 1;
     let max_col = max_cell.1 .1 + 1;
-    println!("{:?}, {:?}", max_row, max_col);
     item_table
         .row()
         .element(
@@ -271,22 +266,23 @@ pub fn generate_invoice(
         for j in 0..max_col {
             for item in &table {
                 if item.1 == (i, 0) {
-                    println!("{:?}", item.1);
                 } else if item.1 == (i, j) {
                     table_row.push_element(
                         elements::Paragraph::new(item.0.clone())
                             .aligned(Alignment::Left)
                             .padded(2),
                     );
-                    println!("pushed col")
                 }
             }
         }
-        println!("pushed row");
         table_row.push().expect("Invalid Row");
     }
-
     doc.push(item_table);
+
+    doc.push(
+        elements::Paragraph::new(format!("Grand Total: ${}", grand_total))
+            .styled(style::Effect::Bold),
+    );
 
     doc.render_to_file(output_file)
         .expect("Failed to write output file");
