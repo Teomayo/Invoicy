@@ -14,38 +14,43 @@
 //! These fonts must be metrically identical to the built-in PDF sans-serif font (Helvetica/Arial).
 
 mod document;
+mod functions;
+mod structs;
 
-use eframe::egui::{self, FontId, Rect, Response, RichText, TextEdit, Ui, Window};
+use eframe::egui::{self, FontId, ProgressBar, Rect, Response, RichText, TextEdit, Ui, Window};
 use egui::{Style, Vec2};
 use egui_extras::{Column, TableBuilder};
+use functions::*;
 use rusqlite::{params, Connection};
+use std::fs;
+use std::{convert::TryInto, path::PathBuf};
+use structs::*;
 
-const IMAGE_PATH_JPG: &'static str = r"images/farbalogo.jpg";
+const IMAGE_PATH_JPG: &'static str = r"images/logo.jpg";
 const DIR_NAME: &str = r"fonts/JetbrainsMono/";
-
-const ESTIMATE_NUMBER: i32 = 1;
 fn main() {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([450.0, 320.0]),
+        // viewport: egui::ViewportBuilder::default().with_inner_size([450.0, 320.0]),
         ..Default::default()
     };
+
     let _ = eframe::run_native(
         "Invoicy",
         options,
         Box::new(|_cc| {
             // This gives us image support:
-            Ok(Box::<MyApp>::default())
+            Ok(Box::<Invoicy>::default())
         }),
     );
 }
 
-impl eframe::App for MyApp {
+impl eframe::App for Invoicy {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if !self.initialized {
             self.setup_tables();
             // sets up tables to have one customer and contact as place holders
             self.add_contact();
-            self.add_customer(ESTIMATE_NUMBER);
+            self.add_customer();
             self.totals.push(Total {
                 value: 0.0,
                 position: (0, 4),
@@ -53,17 +58,20 @@ impl eframe::App for MyApp {
 
             let _ = self.get_contacts();
             let _ = self.get_customers();
+            let _ = self.get_data();
 
             self.style.spacing.button_padding = Vec2::splat(5.0); // Set horizontal and vertical margins
 
             self.file_name = format!(
                 "{}-{:?}",
                 sanitize_string(&self.customer.company),
-                ESTIMATE_NUMBER
+                self.current_row_value.estimate_number
             );
             self.initialized = true;
         }
-
+        // constantly updates based on the customer picked
+        self.update_estimate_number();
+        self.update_file_name();
         // form buttons
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.add_space(2.0);
@@ -74,6 +82,25 @@ impl eframe::App for MyApp {
                     .clicked()
                 {
                     println!("{:?}", "template button not yet functional");
+                }
+                if ui.button("upload logo").clicked() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("jpg", &["jpg"])
+                        .pick_file()
+                    {
+                        let metadata = fs::metadata(&path).unwrap();
+                        if metadata.len() as usize <= self.max_file_size {
+                            self.image_file_path = Some(path);
+                        } else {
+                            ui.label("File size exceeds the limit.");
+                        }
+                    }
+                    if let Some(ref path) = self.image_file_path {
+                        ui.label(format!("Selected file: {:?}", path));
+                        let destination = PathBuf::from("images/logo.jpg");
+                        fs::copy(path, destination).expect("Failed to copy file");
+                        ui.label("File uploaded successfully!");
+                    }
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
                     if ui.button("+ contact").clicked() {
@@ -103,11 +130,7 @@ impl eframe::App for MyApp {
                             );
                             if value.clicked() {
                                 self.customer_selected = i;
-                                self.file_name = format!(
-                                    "{}-{:?}",
-                                    &self.customers[i].company.clone(),
-                                    ESTIMATE_NUMBER
-                                );
+                                self.current_row_value.cust_id = self.generate_customer_id(i);
                             }
                         }
                     });
@@ -275,7 +298,7 @@ impl eframe::App for MyApp {
         });
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
             ui.add_space(2.0);
-
+            self.progress = 0.0;
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
@@ -283,17 +306,27 @@ impl eframe::App for MyApp {
                         ui.text_edit_singleline(&mut self.file_name);
                         ui.label(".pdf")
                     });
+
                     if ui.button("Generate Invoice").clicked() {
-                        document::generate_invoice(
+                        let result = document::generate_invoice(
                             DIR_NAME,
                             IMAGE_PATH_JPG,
                             format!("{}.pdf", self.file_name.clone()),
                             self.contact.clone(),
                             self.customer.clone(),
                             self.table_data.clone(),
-                            ESTIMATE_NUMBER,
+                            self.current_row_value
+                                .estimate_number
+                                .clone()
+                                .try_into()
+                                .unwrap(),
                             self.grand_total,
                         );
+                        println!("{:?}", result);
+                        self.progress = 100.0;
+                        ui.add(ProgressBar::new(self.progress).show_percentage());
+                        self.add_data();
+                        self.add_customer();
                     }
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
@@ -307,73 +340,23 @@ impl eframe::App for MyApp {
     }
 }
 
-#[derive(Debug)]
-struct MyApp {
-    initialized: bool,
-    connection: Connection,
-    style: Style,
-    file_name: String,
-    customer_selected: usize,
-    contact_selected: usize,
-    row_count: usize,
-    last_updated_row: usize,
-    table_data: Vec<(String, (usize, i32), (Rect, Response))>,
-    contact: Contact,
-    contacts: Vec<Contact>,
-    contact_form: bool,
-    customer: Customer,
-    customers: Vec<Customer>,
-    customer_form: bool,
-    current_row_value: RowValues,
-    totals: Vec<Total>,
-    grand_total: f64,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct Total {
-    value: f64,
-    position: (usize, i32),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct Customer {
-    company: String,
-    address: String,
-    city: String,
-    postal_code: String,
-    country: String,
-}
-#[derive(Clone, Debug)]
-struct RowValues {
-    description: String,
-    quantity: f64,
-    price: f64,
-    total: f64,
-}
-#[derive(Clone, Debug, PartialEq)]
-
-struct Contact {
-    company: String,
-    address: String,
-    city: String,
-    postal_code: String,
-    country: String,
-    name: String,
-    telephone: String,
-    email: String,
-    website: String,
-}
-
-impl Default for MyApp {
+impl Default for Invoicy {
     fn default() -> Self {
         Self {
+            max_file_size: 15360,
+            image_file_path: Some(PathBuf::new()),
+            company_error_contact: Some("".to_string()),
+            company_error_customer: Some("".to_string()),
             initialized: false,
+            progress: 0.0,
             connection: Connection::open("invoicy.db").unwrap(),
             style: Style::default(),
             file_name: "invoice.pdf".to_string(),
             customer_selected: 0,
             contact_selected: 0,
             table_data: [].to_vec(),
+            database_data_vec: [].to_vec(),
+            new_database_data_vec: [].to_vec(),
             row_count: 1,
             last_updated_row: 0,
             contact: Contact {
@@ -398,39 +381,56 @@ impl Default for MyApp {
             },
             customers: [].to_vec(),
             customer_form: false,
-            current_row_value: RowValues {
-                description: "".to_string(),
+            current_row_value: DatabaseData {
+                entry_id: "FAKE-1-0".to_string(),
+                cust_id: "FAKE".to_string(),
+                row_number: 0,
+                description: "write something down".to_string(),
                 quantity: 1.0,
                 price: 10.0,
                 total: 10.0,
+                estimate_number: 1,
             },
             grand_total: 0.0,
             totals: [].to_vec(),
         }
     }
 }
-
-fn contains_field(vec: &Vec<Total>, position: &(usize, i32)) -> bool {
-    vec.iter().any(|s| s.position == *position)
-}
-fn sanitize_string(input: &str) -> String {
-    input
-        .to_lowercase()
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() {
-                c
-            } else if c.is_whitespace() {
-                '_'
-            } else {
-                '_'
-            }
-        })
-        .collect()
-}
-impl MyApp {
+impl Invoicy {
     fn calculate_grand_total(&mut self) {
         self.grand_total = self.totals.iter().map(|item| item.value).sum();
+    }
+    fn update_file_name(&mut self) {
+        self.file_name = format!(
+            "{}-{:?}",
+            sanitize_string(&self.customers[self.customer_selected].company.clone()),
+            self.current_row_value.estimate_number
+        );
+    }
+    fn update_estimate_number(&mut self) {
+        let curr_estimate_num = self
+            .database_data_vec
+            .iter()
+            .filter(|x| x.cust_id == self.current_row_value.cust_id)
+            .map(|item| item.estimate_number)
+            .max();
+        if curr_estimate_num == None {
+            self.current_row_value.estimate_number = 1
+        } else {
+            self.current_row_value.estimate_number = curr_estimate_num.unwrap() + 1
+        }
+    }
+    fn generate_customer_id(&mut self, idx: usize) -> String {
+        let cust_id = format!(
+            "{}",
+            &self.customers[idx]
+                .company
+                .clone()
+                .to_uppercase()
+                .get(0..4)
+                .unwrap(),
+        );
+        return cust_id;
     }
     fn get_contacts(&mut self) -> Result<String, rusqlite::Error> {
         let mut stmt = self.connection.prepare("SELECT * FROM contacts")?;
@@ -467,6 +467,26 @@ impl MyApp {
             self.customers.push(customer_row.unwrap())
         }
         Ok("Customers Initialized from DB.".to_string())
+    }
+    fn get_data(&mut self) -> Result<String, rusqlite::Error> {
+        let mut stmt = self.connection.prepare("SELECT * FROM data")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(DatabaseData {
+                entry_id: row.get(0)?,
+                cust_id: row.get(1)?,
+                estimate_number: row.get(2)?,
+                row_number: row.get(3)?,
+                description: row.get(4)?,
+                quantity: row.get(5)?,
+                price: row.get(6)?,
+                total: row.get(7)?,
+            })
+        })?;
+        // this will end up being slow as data builds up will need to figure out a better method
+        for data_row in rows {
+            self.database_data_vec.push(data_row.unwrap())
+        }
+        Ok("Data Initialized from DB.".to_string())
     }
 
     fn setup_tables(&mut self) {
@@ -505,13 +525,14 @@ impl MyApp {
         }
         let data_result = self.connection.execute(
             "CREATE TABLE IF NOT EXISTS data (
-                    id INTEGER PRIMARY KEY,
-                    cust_id INTEGER NOT NULL,
+                    entry_id TEXT PRIMARY KEY,
+                    cust_id TEXT NOT NULL,
+                    estimate_number INTEGER NOT NULL,
+                    row_number INTEGER NOT NULL,
                     description TEXT NOT NULL,
                     quantity REAL,
                     price REAL,
-                    total REAL,
-                    FOREIGN KEY(cust_id) REFERENCES Customer(id)
+                    total REAL
                 )",
             [],
         );
@@ -523,7 +544,7 @@ impl MyApp {
 
     fn add_contact(&mut self) {
         let updated = &self.connection.execute(
-            "INSERT OR REPLACE INTO contacts (company, address, city, postal_code, country, name, telephone, email, website ) 
+            "INSERT OR REPLACE INTO contacts (company, address, city, postal_code, country, name, telephone, email, website )
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             ",
             params![
@@ -543,7 +564,7 @@ impl MyApp {
             Err(e) => println!("Error: {}", e),
         }
     }
-    fn add_customer(&mut self, estimate_number: i32) {
+    fn add_customer(&mut self) {
         let updated = &self.connection.execute(
             "INSERT OR REPLACE INTO customers (company, address, city, postal_code, country, estimate_number) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
@@ -552,7 +573,7 @@ impl MyApp {
                 self.customer.city.clone(),
                 self.customer.postal_code.clone(),
                 self.customer.country.clone(),
-                estimate_number
+                self.current_row_value.estimate_number.clone()
             ],
         );
         match updated {
@@ -560,38 +581,78 @@ impl MyApp {
             Err(e) => println!("Error: {}", e),
         }
     }
-    // fn add_data(&mut self) {
-    //     for idx in 0..self.row_count {
-    //             // currently hardcoded until there is a plan for table customizability
-    //             for column_count in 0..5 {
-    //                 for cell in &mut self.table_data {
+    fn add_data(&mut self) {
+        for i in 0..self.row_count {
+            let mut data: DatabaseData = DatabaseData {
+                entry_id: "".to_string(),
+                cust_id: self.generate_customer_id(self.customer_selected),
+                estimate_number: self.current_row_value.estimate_number,
+                row_number: 0,
+                description: "".to_string(),
+                quantity: 1.0,
+                price: 1.0,
+                total: 1.0,
+            };
+            for _ in 0..5 {
+                for item in &self.table_data {
+                    if item.1 == (i, 0) {
+                        data.row_number = i;
+                    } else if item.1 == (i, 1) {
+                        data.description = item.0.clone()
+                    } else if item.1 == (i, 2) {
+                        if item.0.parse::<f64>().is_ok() {
+                            data.quantity = item.0.parse().unwrap();
+                        } else {
+                            data.quantity = 0.0
+                        };
+                    } else if item.1 == (i, 3) {
+                        if item.0.parse::<f64>().is_ok() {
+                            data.price = item.0.parse().unwrap();
+                        } else {
+                            data.price = 0.0
+                        };
+                    } else if item.1 == (i, 4) {
+                        if item.0.parse::<f64>().is_ok() {
+                            data.total = item.0.parse().unwrap();
+                        } else {
+                            data.total = 0.0
+                        };
+                    }
+                }
+            }
 
-    //                     if column_count == 1 {
+            data.entry_id = format!(
+                "{}-{:?}-{:?}",
+                self.generate_customer_id(self.customer_selected),
+                data.estimate_number,
+                data.row_number
+            );
+            self.new_database_data_vec.push(data);
+        }
+        for item in &self.new_database_data_vec {
+            let updated = &self.connection.execute(
+                        "INSERT OR REPLACE INTO data (entry_id, estimate_number, cust_id, row_number, description, quantity, price, total) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                        params![
+                            item.entry_id,
+                            item.estimate_number,
+                            item.cust_id,
+                            item.row_number,
+                            item.description,
+                            item.quantity,
+                            item.price,
+                            item.total,
 
-    //                     } else if column_count == 2 {
-
-    //                     } else if column_count == 3 {
-
-    //                     } else if column_count == 4 {
-
-    //                     } else {
-
-    //                     }
-    //                     let updated = &self.connection.execute(
-    //                         "INSERT INTO data (description, quantity, price, total, cust_id) VALUES (?1, ?2, ?3, ?4, ?5)",
-    //                         params![
-    //                             cell.0,
-
-    //                         ],
-    //                     );
-    //                     match updated {
-    //                         Ok(value) => println!("Success: {}", value),
-    //                         Err(e) => println!("Error: {}", e),
-    //                     }
-    //             }
-    //         }
-    //     }
-    // }
+                        ],
+                    );
+            match updated {
+                Ok(value) => println!("Success: {}", value),
+                Err(e) => println!("Error: {}", e),
+            }
+        }
+        self.database_data_vec
+            .extend_from_slice(&self.new_database_data_vec);
+        self.new_database_data_vec.clear();
+    }
     fn show_form(&mut self, ui: &mut Ui) {
         if self.contact_form {
             Window::new("Contact Form").show(ui.ctx(), |ui| {
@@ -599,7 +660,13 @@ impl MyApp {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
                         ui.label("Company Name: ");
-                        ui.text_edit_singleline(&mut self.contact.company);
+                        let response = ui.text_edit_singleline(&mut self.contact.company);
+                        if response.changed() {
+                            self.company_error_contact = validate_text_input(&self.contact.company);
+                        }
+                        if let Some(error) = &self.company_error_contact {
+                            ui.colored_label(egui::Color32::RED, error);
+                        }
                     });
                     ui.horizontal(|ui| {
                         ui.label("Address: ");
@@ -652,7 +719,14 @@ impl MyApp {
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
                         ui.label("Company Name: ");
-                        ui.text_edit_singleline(&mut self.customer.company);
+                        let response = ui.text_edit_singleline(&mut self.customer.company);
+                        if response.changed() {
+                            self.company_error_customer =
+                                validate_text_input(&self.customer.company);
+                        }
+                        if let Some(error) = &self.company_error_customer {
+                            ui.colored_label(egui::Color32::RED, error);
+                        }
                     });
                     ui.horizontal(|ui| {
                         ui.label("Address: ");
@@ -674,7 +748,7 @@ impl MyApp {
                         // can add checks for same contact later on
 
                         self.customers.push(self.customer.clone());
-                        self.add_customer(ESTIMATE_NUMBER);
+                        self.add_customer();
                         self.customer_form = false;
                     };
                     ui.separator();
