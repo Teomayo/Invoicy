@@ -1,9 +1,3 @@
-// SPDX-FileCopyrightText: 2021 Robin Krahl <robin.krahl@ireas.org>
-// SPDX-License-Identifier: CC0-1.0
-
-//! This example generates a minimal PDF document and writes it to the path that was passed as the
-//! first command-line argument.  The size of the generated document should be 2.0 KB.
-//!
 //! You may have to adapt the `FONT_DIRS` and `DEFAULT_FONT_NAME` constants for your system so that
 //! these files exist:
 //! - `{FONT_DIR}/{DEFAULT_FONT_NAME}-Regular.ttf`
@@ -37,6 +31,7 @@ pub fn generate_invoice(
     // wasn't sure how to get system name in global variables so doing this for now
     // let account_name: String = whoami::username().to_string();
     // let dir_name: String = format!("/Users/{account_name}/Library/Fonts/").to_string();
+
     let font_dirs: &[String] = &[font_dir.to_string()];
     let collection: Vec<&str> = (font_dir.split(r"/")).collect::<Vec<&str>>();
 
@@ -54,6 +49,7 @@ pub fn generate_invoice(
     let default_font = fonts::from_files(font_dir, font_name, Some(fonts::Builtin::Helvetica))
         .expect("Failed to load the default font family");
 
+    // fonts loaded
     let mut doc = genpdf::Document::new(default_font);
 
     let mut decorator = genpdf::SimplePageDecorator::new();
@@ -266,6 +262,7 @@ pub fn generate_invoice(
         for j in 0..max_col {
             for item in &table {
                 if item.1 == (i, 0) {
+                    // this is just the row number so we can skip it
                 } else if item.1 == (i, j) {
                     table_row.push_element(
                         elements::Paragraph::new(item.0.clone())
