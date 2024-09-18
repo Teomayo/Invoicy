@@ -7,6 +7,8 @@
 //!
 //! These fonts must be metrically identical to the built-in PDF sans-serif font (Helvetica/Arial).
 
+use std::path::PathBuf;
+
 use crate::Rect;
 use crate::Response;
 use chrono::prelude::*;
@@ -18,10 +20,11 @@ use genpdf::{elements, fonts, style};
 use crate::Contact;
 use crate::Customer;
 
+const IMAGE_PATH_JPG: &'static str = r"images/logo.jpg";
+const DIR_NAME: &str = r"fonts/JetbrainsMono/";
+
 pub fn generate_invoice(
-    font_dir: &str,
-    logo_path: &str,
-    file_name: String,
+    file_name: &PathBuf,
     contact_info: Contact,
     customer_info: Customer,
     table: Vec<(String, (usize, i32), (Rect, Response))>,
@@ -32,8 +35,8 @@ pub fn generate_invoice(
     // let account_name: String = whoami::username().to_string();
     // let dir_name: String = format!("/Users/{account_name}/Library/Fonts/").to_string();
 
-    let font_dirs: &[String] = &[font_dir.to_string()];
-    let collection: Vec<&str> = (font_dir.split(r"/")).collect::<Vec<&str>>();
+    let font_dirs: &[String] = &[DIR_NAME.to_string()];
+    let collection: Vec<&str> = (DIR_NAME.split(r"/")).collect::<Vec<&str>>();
 
     // this part is kind of unnecessary, simplify in the future
     let font_name_index: usize = 1;
@@ -125,7 +128,7 @@ pub fn generate_invoice(
         .row()
         .element(address_table)
         .element(
-            elements::Image::from_path(logo_path)
+            elements::Image::from_path(IMAGE_PATH_JPG)
                 .expect("Unable to load image")
                 .with_alignment(Alignment::Right),
         )

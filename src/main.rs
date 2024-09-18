@@ -21,19 +21,17 @@ use eframe::egui::{self, FontId, ProgressBar, Rect, Response, RichText, TextEdit
 use egui::{Style, Vec2};
 use egui_extras::{Column, TableBuilder};
 use functions::*;
+use rfd::FileDialog;
 use rusqlite::{params, Connection};
 use std::fs;
 use std::{convert::TryInto, path::PathBuf};
 use structs::*;
 
-const IMAGE_PATH_JPG: &'static str = r"images/logo.jpg";
-const DIR_NAME: &str = r"fonts/JetbrainsMono/";
 fn main() {
     let options = eframe::NativeOptions {
-        // viewport: egui::ViewportBuilder::default().with_inner_size([450.0, 320.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([450.0, 320.0]),
         ..Default::default()
     };
-
     let _ = eframe::run_native(
         "Invoicy",
         options,
@@ -77,12 +75,13 @@ impl eframe::App for Invoicy {
             ui.add_space(2.0);
             ui.style_mut().spacing.button_padding = self.style.spacing.button_padding;
             ui.horizontal(|ui| {
-                if ui
-                    .add_enabled(false, egui::Button::new("+ template"))
-                    .clicked()
-                {
-                    println!("{:?}", "template button not yet functional");
-                }
+                // template button disabled until ready to be worked on
+                // if ui
+                //     .add_enabled(false, egui::Button::new("+ template"))
+                //     .clicked()
+                // {
+                //     println!("{:?}", "template button not yet functional");
+                // }
                 if ui.button("upload logo").clicked() {
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("jpg", &["jpg"])
@@ -96,10 +95,15 @@ impl eframe::App for Invoicy {
                         }
                     }
                     if let Some(ref path) = self.image_file_path {
+                        // currently only supports one logo option.
+                        // This would change with the template feature.
                         ui.label(format!("Selected file: {:?}", path));
                         let destination = PathBuf::from("images/logo.jpg");
-                        fs::copy(path, destination).expect("Failed to copy file");
-                        ui.label("File uploaded successfully!");
+                        let result = fs::copy(path, destination);
+                        match result {
+                            Ok(value) => println!("Success: {}", value),
+                            Err(e) => println!("Error: {}", e),
+                        }
                     }
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
@@ -308,30 +312,38 @@ impl eframe::App for Invoicy {
                     });
 
                     if ui.button("Generate Invoice").clicked() {
-                        let result = document::generate_invoice(
-                            DIR_NAME,
-                            IMAGE_PATH_JPG,
-                            format!("{}.pdf", self.file_name.clone()),
-                            self.contact.clone(),
-                            self.customer.clone(),
-                            self.table_data.clone(),
-                            self.current_row_value
-                                .estimate_number
-                                .clone()
-                                .try_into()
-                                .unwrap(),
-                            self.grand_total,
-                        );
-                        println!("{:?}", result);
-                        self.progress = 100.0;
-                        ui.add(ProgressBar::new(self.progress).show_percentage());
-                        self.add_data();
-                        self.add_customer();
+                        if let Some(path) = FileDialog::new()
+                            .set_file_name(format!("{}.pdf", self.file_name.clone()))
+                            .save_file()
+                        {
+                            // Handle the file path here
+                            let result = document::generate_invoice(
+                                &path,
+                                self.contact.clone(),
+                                self.customer.clone(),
+                                self.table_data.clone(),
+                                self.current_row_value
+                                    .estimate_number
+                                    .clone()
+                                    .try_into()
+                                    .unwrap(),
+                                self.grand_total,
+                            );
+                            println!("{:?}", result);
+                            println!("File saved to: {:?}", &path);
+                            self.progress = 100.0;
+                            ui.add(ProgressBar::new(self.progress).show_percentage());
+                            self.add_data();
+                            self.add_customer();
+                        }
                     }
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
                     if ui.button("?").clicked() {
-                        println!("report something");
+                        let to = "tode.crnobrnja@example.com";
+                        let subject = "Report Issue";
+                        let mailto = format!("mailto:{}?subject={}", to, subject,);
+                        open::that(mailto).unwrap();
                     }
                 });
             });
