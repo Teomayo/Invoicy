@@ -1,6 +1,9 @@
 [![license](https://shields.io/badge/license-MIT-green)](https://github.com/Teomayo/invoicy/blob/main/LICENSE.md)
+![Build Status](https://github.com/Teomayo/Invoicy/.github/workflows/build.yml/badge.svg)
 
-# Invoicy
+![Temporary Logo :)](https://github.com/Teomayo/Invoicy/support/images/128x128.png)
+# Invoicy 
+
 ## A simple way to send invoices
 
 In an effort to support small businesses Invoicy provides the essentials for generating clean looking documents quickly. I will keep things updated here as improvements are made, feel free to chime in with ideas that you think may be useful (that aren't in my list already).
@@ -8,8 +11,7 @@ In an effort to support small businesses Invoicy provides the essentials for gen
 # Features
 - Fast pdf generation
 - Saves any contacts and customers that are generated
-- cross platform (Mac and Windows)
-- the application is < 30 MB and uses < 60 MB of memory (on windows)
+- cross platform (Mac, Windows, Linux)
 
 ## Getting Started
 In order to be able to change the image on the invoice you would need to download everything locally. You can do this by:
@@ -32,11 +34,8 @@ Below is a screenshot of the pdf file that is genrated after hitting **Generate 
 ![Invoicy PDF](support/extra/invoicy-pdf-screenshot.png)
 
 # Future Plans
-- storing all table data to allow for historic searches
 - google drive backup
-- choosing where files are saved
-- automatic sorting of pdf's by customer
-- ability to directly report any problems
-- ability to upload an image via graphical interface
 - templating ability to allow for more custom invoice structures
+- PDF preview screen
+- Earnings reporting which uses historical data
 
