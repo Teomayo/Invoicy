@@ -1,18 +1,3 @@
-// SPDX-FileCopyrightText: 2021 Robin Krahl <robin.krahl@ireas.org>
-// SPDX-License-Identifier: CC0-1.0
-
-//! This example generates a minimal PDF document and writes it to the path that was passed as the
-//! first command-line argument.  The size of the generated document should be 2.0 KB.
-//!
-//! You may have to adapt the `FONT_DIRS` and `DEFAULT_FONT_NAME` constants for your system so that
-//! these files exist:
-//! - `{FONT_DIR}/{DEFAULT_FONT_NAME}-Regular.ttf`
-//! - `{FONT_DIR}/{DEFAULT_FONT_NAME}-Bold.ttf`
-//! - `{FONT_DIR}/{DEFAULT_FONT_NAME}-Italic.ttf`
-//! - `{FONT_DIR}/{DEFAULT_FONT_NAME}-BoldItalic.ttf`
-//!
-//! These fonts must be metrically identical to the built-in PDF sans-serif font (Helvetica/Arial).
-
 mod document;
 mod functions;
 mod structs;
@@ -27,11 +12,18 @@ use std::fs;
 use std::{convert::TryInto, path::PathBuf};
 use structs::*;
 
+const LOGGER: bool = false;
+
 fn main() {
+    egui_logger::builder().init().unwrap();
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([450.0, 320.0]),
+        // with_icon causes crashes on application when using 'cargo build' or 'cargo release'
+        viewport: egui::ViewportBuilder::default()
+            // .with_icon(load_icon("support/images/128x128.png"))
+            .with_inner_size([450.0, 320.0]),
         ..Default::default()
     };
+
     let _ = eframe::run_native(
         "Invoicy",
         options,
@@ -44,6 +36,12 @@ fn main() {
 
 impl eframe::App for Invoicy {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if LOGGER == true {
+            egui::Window::new("Log").show(ctx, |ui| {
+                // draws the logger ui.
+                egui_logger::logger_ui().show(ui);
+            });
+        }
         if !self.initialized {
             self.setup_tables();
             // sets up tables to have one customer and contact as place holders
@@ -65,6 +63,7 @@ impl eframe::App for Invoicy {
                 sanitize_string(&self.customer.company),
                 self.current_row_value.estimate_number
             );
+
             self.initialized = true;
         }
         // constantly updates based on the customer picked
@@ -98,11 +97,11 @@ impl eframe::App for Invoicy {
                         // currently only supports one logo option.
                         // This would change with the template feature.
                         ui.label(format!("Selected file: {:?}", path));
-                        let destination = PathBuf::from("images/logo.jpg");
+                        let destination = PathBuf::from("support/images/logo.jpg");
                         let result = fs::copy(path, destination);
                         match result {
-                            Ok(value) => println!("Success: {}", value),
-                            Err(e) => println!("Error: {}", e),
+                            Ok(value) => println!("LOG: Logo Upload Successful {}", value),
+                            Err(e) => println!("ERROR: Failure to Load Logo {}", e),
                         }
                     }
                 }
@@ -514,8 +513,8 @@ impl Invoicy {
             [],
         );
         match customer_result {
-            Ok(value) => println!("Success: {}", value),
-            Err(e) => println!("Error: {}", e),
+            Ok(value) => println!("LOG: Customer Table Setup was Successful: {}", value),
+            Err(e) => println!("ERROR: Customer Table not setup Correctly {}", e),
         }
         let contact_result = self.connection.execute(
             "CREATE TABLE IF NOT EXISTS contacts (
@@ -532,8 +531,8 @@ impl Invoicy {
             [],
         );
         match contact_result {
-            Ok(value) => println!("Success: {}", value),
-            Err(e) => println!("Error: {}", e),
+            Ok(value) => println!("LOG: Contact Table Setup was Successful {}", value),
+            Err(e) => println!("ERROR: Contact Table not setup Correctly {}", e),
         }
         let data_result = self.connection.execute(
             "CREATE TABLE IF NOT EXISTS data (
@@ -549,8 +548,8 @@ impl Invoicy {
             [],
         );
         match data_result {
-            Ok(value) => println!("Success: {}", value),
-            Err(e) => println!("Error: {}", e),
+            Ok(value) => println!("LOG: Data Table Setup was Successful {}", value),
+            Err(e) => println!("ERROR: Data Table not setup Correctly {}", e),
         }
     }
 
@@ -572,8 +571,8 @@ impl Invoicy {
             ],
         );
         match updated {
-            Ok(value) => println!("Success: {}", value),
-            Err(e) => println!("Error: {}", e),
+            Ok(value) => println!("LOG: Contact Added Succesfully {}", value),
+            Err(e) => println!("ERROR: Contact unable to be Added {}", e),
         }
     }
     fn add_customer(&mut self) {
@@ -589,8 +588,8 @@ impl Invoicy {
             ],
         );
         match updated {
-            Ok(value) => println!("Success: {}", value),
-            Err(e) => println!("Error: {}", e),
+            Ok(value) => println!("LOG: Customer Added Successfully: {}", value),
+            Err(e) => println!("ERROR: Customer unable to be Added {}", e),
         }
     }
     fn add_data(&mut self) {
@@ -657,8 +656,8 @@ impl Invoicy {
                         ],
                     );
             match updated {
-                Ok(value) => println!("Success: {}", value),
-                Err(e) => println!("Error: {}", e),
+                Ok(value) => println!("LOG: Data Added Successfully: {}", value),
+                Err(e) => println!("LOG: Error in Data Addition: {}", e),
             }
         }
         self.database_data_vec

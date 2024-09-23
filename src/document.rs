@@ -20,7 +20,7 @@ use genpdf::{elements, fonts, style};
 use crate::Contact;
 use crate::Customer;
 
-const IMAGE_PATH_JPG: &'static str = r"images/logo.jpg";
+const IMAGE_PATH_JPG: &'static str = r"support/images/logo.jpg";
 const DIR_NAME: &str = r"fonts/JetbrainsMono/";
 
 pub fn generate_invoice(
