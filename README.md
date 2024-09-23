@@ -1,7 +1,7 @@
 [![license](https://shields.io/badge/license-MIT-green)](https://github.com/Teomayo/invoicy/blob/main/LICENSE.md)
-![Build Status](https://github.com/Teomayo/Invoicy/.github/workflows/build.yml/badge.svg)
+![Build Status](https://github.com/Teomayo/Invoicy/blob/main/.github/workflows/build.yml/badge.svg)
 
-![Temporary Logo :)](https://github.com/Teomayo/Invoicy/support/images/128x128.png)
+![Temporary Logo :)](https://github.com/Teomayo/Invoicy/blob/develop/main/support/images/128x128.png)
 # Invoicy 
 
 ## A simple way to send invoices
