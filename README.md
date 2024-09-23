@@ -1,8 +1,8 @@
 [![license](https://shields.io/badge/license-MIT-green)](https://github.com/Teomayo/invoicy/blob/main/LICENSE.md)
 
-![Build Status]((https://github.com/Teomayo/Invoicy/actions/workflows/build/badge.svg))
+![Build Status](https://github.com/Teomayo/Invoicy/actions/workflows/build.yml/badge.svg)
 
-![Temporary Logo :)](https://github.com/Teomayo/Invoicy/blob/main/support/images/128x128.png)
+![Temporary Logo :)](https://github.com/Teomayo/Invoicy/blob/main/support/images/128x128.png?raw=true)
 
 # Invoicy 
 
