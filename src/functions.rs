@@ -40,3 +40,19 @@ pub fn load_icon(path: &str) -> egui::IconData {
         height: icon_height,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_sanitize_string() {
+        assert_eq!(sanitize_string("Hey There 1 2 3 $"), "hey_there_1_2_3__");
+    }
+    #[test]
+    fn test_validate_text_input() {
+        assert_eq!(
+            validate_text_input(""),
+            Some("Input cannot be empty".to_string())
+        );
+    }
+}
