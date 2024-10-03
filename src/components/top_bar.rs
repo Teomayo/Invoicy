@@ -100,6 +100,10 @@ impl Invoicy {
                         ui.label("Country: ");
                         ui.text_edit_singleline(&mut self.customer.country);
                     });
+                    ui.horizontal(|ui| {
+                        ui.label("Email: ");
+                        ui.text_edit_singleline(&mut self.customer.email);
+                    });
                     if ui.button("Save Customer").clicked() {
                         // can add checks for same contact later on
 
@@ -139,13 +143,14 @@ impl Invoicy {
     }
     pub fn add_customer(&mut self) {
         let updated = &self.connection.execute(
-            "INSERT OR REPLACE INTO customers (company, address, city, postal_code, country, estimate_number) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT OR REPLACE INTO customers (company, address, city, postal_code, country, email, estimate_number) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 self.customer.company.clone(),
                 self.customer.address.clone(),
                 self.customer.city.clone(),
                 self.customer.postal_code.clone(),
                 self.customer.country.clone(),
+                self.customer.email.clone(),
                 self.current_row_value.estimate_number.clone()
             ],
         );
@@ -223,6 +228,7 @@ impl Invoicy {
                 city: row.get(2)?,
                 postal_code: row.get(3)?,
                 country: row.get(4)?,
+                email: row.get(5)?,
             })
         })?;
         for customer_row in rows {

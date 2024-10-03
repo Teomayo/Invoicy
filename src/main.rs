@@ -47,6 +47,7 @@ impl eframe::App for Invoicy {
         self.update_file_name();
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            self.show_menu(ui);
             ui.add_space(2.0);
             ui.style_mut().spacing.button_padding = self.style.spacing.button_padding;
 
@@ -87,9 +88,12 @@ impl eframe::App for Invoicy {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     self.file_namer(ui);
-                    self.generate_invoice(ui);
+                    ui.horizontal(|ui| {
+                        self.generate_invoice(ui);
+                    })
                 });
                 self.send_report(ui);
+                // self.save_dialog(ui);
             });
             ui.add_space(2.0);
         });
@@ -99,7 +103,11 @@ impl eframe::App for Invoicy {
 impl Default for Invoicy {
     fn default() -> Self {
         Self {
+            auth_email_dialog: false,
+            email_for_auth: "example@example.com".to_string(),
+            password_for_auth: "johnDoe1".to_string(),
             max_file_size: 15360,
+            show_dialog: false,
             image_file_path: Some(PathBuf::new()),
             company_error_contact: Some("".to_string()),
             company_error_customer: Some("".to_string()),
@@ -134,6 +142,7 @@ impl Default for Invoicy {
                 city: "Fakeshire".to_string(),
                 postal_code: "F4K 3A3".to_string(),
                 country: "Fakeland".to_string(),
+                email: "example@example.com".to_string(),
             },
             customers: [].to_vec(),
             customer_form: false,
@@ -149,6 +158,7 @@ impl Default for Invoicy {
             },
             grand_total: 0.0,
             totals: [].to_vec(),
+            emails: [].to_vec(),
         }
     }
 }
@@ -235,4 +245,9 @@ struct Invoicy {
     current_row_value: DatabaseData,
     totals: Vec<Total>,
     grand_total: f64,
+    show_dialog: bool,
+    password_for_auth: String,
+    email_for_auth: String,
+    auth_email_dialog: bool,
+    emails: Vec<Credential>,
 }

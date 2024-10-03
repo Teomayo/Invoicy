@@ -222,6 +222,19 @@ impl Invoicy {
     }
 
     pub fn setup_tables(&mut self) {
+        let credentials_result = self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS credentials (
+            id INTEGER PRIMARY KEY,
+            email TEXT NOT NULL,
+            password TEXT NOT NULL,
+            password_hash TEXT NOT NULL
+        )",
+            [],
+        );
+        match credentials_result {
+            Ok(value) => println!("LOG: Credentials Table Setup was Successful: {}", value),
+            Err(e) => println!("ERROR: Credentials Table not setup Correctly {}", e),
+        }
         let customer_result = self.connection.execute(
             "CREATE TABLE IF NOT EXISTS customers (
                     company TEXT PRIMARY KEY,
@@ -229,6 +242,7 @@ impl Invoicy {
                     city TEXT NOT NULL,
                     postal_code TEXT NOT NULL,
                     country TEXT NOT NULL,
+                    email TEXT NOT NULL,
                     estimate_number INTEGER
                 )",
             [],

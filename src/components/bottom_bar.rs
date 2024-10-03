@@ -1,8 +1,14 @@
-use std::convert::TryInto;
-
-use eframe::egui::{Align, Layout, ProgressBar, Ui};
+use crate::structs::Credential;
+use eframe::egui::{Align, Align2, Layout, ProgressBar, Ui, Window};
+use lettre::message::{Attachment, MultiPart, SinglePart};
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::{Message, SmtpTransport, Transport};
 use rfd::FileDialog;
 use rusqlite::params;
+use std::convert::TryInto;
+use std::fs::File;
+use std::io::Read;
+use std::path::PathBuf;
 
 use crate::document::generate_invoice;
 use crate::functions::sanitize_string;
@@ -21,31 +27,166 @@ impl Invoicy {
 
     pub fn generate_invoice(&mut self, ui: &mut Ui) {
         if ui.button("Generate Invoice").clicked() {
-            if let Some(path) = FileDialog::new()
-                .set_file_name(format!("{}.pdf", self.file_name.clone()))
-                .save_file()
-            {
-                // Handle the file path here
-                let result = generate_invoice(
-                    &path,
-                    self.contact.clone(),
-                    self.customer.clone(),
-                    self.table_data.clone(),
-                    self.current_row_value
-                        .estimate_number
-                        .clone()
-                        .try_into()
-                        .unwrap(),
-                    self.grand_total,
-                );
-                println!("{:?}", result);
-                println!("File saved to: {:?}", &path);
-                self.progress = 100.0;
-                ui.add(ProgressBar::new(self.progress).show_percentage());
-                self.add_data();
-                self.add_customer();
-            }
+            self.show_dialog = true;
+            println!("{}", format!("LOG: Dialog Opened: {}", self.show_dialog));
         }
+        self.save_dialog(ui);
+    }
+
+    fn save_dialog(&mut self, ui: &mut Ui) {
+        if self.show_dialog {
+            Window::new("Save or Send?")
+                .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ui.ctx(), |ui| {
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            if ui.button("Save").clicked() {
+                                if let Some(path) = FileDialog::new()
+                                    .set_file_name(format!("{}.pdf", self.file_name.clone()))
+                                    .save_file()
+                                {
+                                    // Handle the file path here
+                                    let result = generate_invoice(
+                                        &path,
+                                        self.contact.clone(),
+                                        self.customer.clone(),
+                                        self.table_data.clone(),
+                                        self.current_row_value
+                                            .estimate_number
+                                            .clone()
+                                            .try_into()
+                                            .unwrap(),
+                                        self.grand_total,
+                                    );
+                                    self.progress = 100.0;
+                                    ui.add(ProgressBar::new(self.progress).show_percentage());
+                                    self.add_data();
+                                    self.add_customer();
+
+                                    println!("{:?}", result);
+                                    println!("File saved to: {:?}", &path);
+                                    self.show_dialog = false;
+                                }
+                            }
+                            if ui.button("Send").clicked() {
+                                // email check
+
+                                let _ = self.get_creds();
+
+                                let path =
+                                    &PathBuf::from(format!("{}.pdf", self.file_name.clone()));
+                                let result = generate_invoice(
+                                    path,
+                                    self.contact.clone(),
+                                    self.customer.clone(),
+                                    self.table_data.clone(),
+                                    self.current_row_value
+                                        .estimate_number
+                                        .clone()
+                                        .try_into()
+                                        .unwrap(),
+                                    self.grand_total,
+                                );
+                                let to_email = format!(
+                                    "Recipient Name <{}>",
+                                    &self.customers[self.customer_selected].email
+                                );
+                                let from_email = format!(
+                                    "{} <{}>",
+                                    &self.contacts[self.contact_selected].name,
+                                    self.contacts[self.contact_selected].email
+                                );
+                                let subject = format!(
+                                    "{} Invoice: {}",
+                                    self.contacts[self.contact_selected].name,
+                                    self.current_row_value.estimate_number
+                                );
+                                // let pdf_data = fs::read(path);
+                                let mut file = File::open(path).expect("Path not found");
+                                let mut buffer = Vec::new();
+                                file.read_to_end(&mut buffer).expect("File failed to read");
+
+                                let email = Message::builder()
+                                    .from(from_email.parse().unwrap())
+                                    .to(to_email.parse().unwrap())
+                                    .subject(subject)
+                                    .multipart(
+                                        MultiPart::mixed()
+                                            .singlepart(SinglePart::plain(
+                                                "Welcome to our service!".to_string(),
+                                            ))
+                                            .singlepart(
+                                                Attachment::new(format!(
+                                                    "{}.pdf",
+                                                    self.file_name.clone()
+                                                ))
+                                                .body(
+                                                    buffer,
+                                                    "application/pdf".parse().expect("Body failed"),
+                                                ),
+                                            ),
+                                    )
+                                    .unwrap();
+
+                                let mut correct_contact: Vec<(String, String)> = [].to_vec();
+                                for credential in &self.emails {
+                                    if credential.email
+                                        == self.contacts[self.contact_selected].email
+                                    {
+                                        correct_contact = [(
+                                            credential.email.clone(),
+                                            credential.password.clone(),
+                                        )]
+                                        .to_vec();
+                                    }
+                                }
+                                let creds = Credentials::new(
+                                    correct_contact[0].0.to_string(),
+                                    correct_contact[0].1.to_string(),
+                                );
+
+                                let mailer = SmtpTransport::relay("smtp.gmail.com")
+                                    .unwrap()
+                                    .credentials(creds)
+                                    .build();
+
+                                // Send the email
+                                match mailer.send(&email) {
+                                    Ok(_) => println!("Email sent successfully!"),
+                                    Err(e) => println!("Could not send email: {:?}", e),
+                                }
+
+                                self.progress = 100.0;
+                                ui.add(ProgressBar::new(self.progress).show_percentage());
+                                self.add_data();
+                                self.add_customer();
+
+                                println!("{:?}", result);
+                                println!("Email being sent to: {:?}", self.customer.email);
+                                self.show_dialog = false;
+                            }
+                        });
+                        ui.separator();
+                        if ui.button("Close").clicked() {
+                            self.show_dialog = false;
+                        }
+                    });
+                });
+        }
+    }
+
+    pub fn get_creds(&mut self) -> Result<String, rusqlite::Error> {
+        let mut stmt = self.connection.prepare("SELECT * FROM credentials")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(Credential {
+                email: row.get(1)?,
+                password: row.get(2)?,
+            })
+        })?;
+        for credential in rows {
+            self.emails.push(credential.unwrap())
+        }
+        Ok("Retrieved emails from DB.".to_string())
     }
 
     pub fn send_report(&mut self, ui: &mut Ui) {

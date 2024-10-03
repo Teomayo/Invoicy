@@ -10,6 +10,7 @@ pub struct Customer {
     pub city: String,
     pub postal_code: String,
     pub country: String,
+    pub email: String,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct DatabaseData {
@@ -33,4 +34,9 @@ pub struct Contact {
     pub telephone: String,
     pub email: String,
     pub website: String,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct Credential {
+    pub email: String,
+    pub password: String,
 }
